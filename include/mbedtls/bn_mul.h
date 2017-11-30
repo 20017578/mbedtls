@@ -661,6 +661,10 @@
 
 #endif /* ARMv3 */
 
+#if defined(__aarch64__)
+#include "bm_mul.h"
+#endif /* __aarch64__ */
+
 #if defined(__alpha__)
 
 #define MULADDC_INIT                    \
