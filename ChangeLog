@@ -14,6 +14,58 @@ Security
 
 Features
    * Allow comments in test data files.
+   * The selftest program can execute a subset of the tests based on command
+     line arguments.
+   * New unit tests for timing. Improve the self-test to be more robust
+     when run on a heavily-loaded machine.
+   * Add alternative implementation support for CCM and CMAC (MBEDTLS_CCM_ALT,
+     MBEDTLS_CMAC_ALT). Submitted by Steve Cooreman, Silicon Labs.
+   * Add support for alternative implementations of GCM, selected by the
+     configuration flag MBEDTLS_GCM_ALT.
+   * Add support for alternative implementations for ECDSA, controlled by new
+     configuration flags MBEDTLS_ECDSA_SIGN_ALT, MBEDTLS_ECDSA_VERIFY_ALT and
+     MBEDTLS_ECDSDA_GENKEY_AT in config.h.
+     The following functions from the ECDSA module can be replaced
+     with alternative implementation:
+     mbedtls_ecdsa_sign(), mbedtls_ecdsa_verify() and mbedtls_ecdsa_genkey().
+   * Add support for alternative implementation of ECDH, controlled by the
+     new configuration flags MBEDTLS_ECDH_COMPUTE_SHARED_ALT and
+     MBEDTLS_ECDH_GEN_PUBLIC_ALT in config.h.
+     The following functions from the ECDH module can be replaced
+     with an alternative implementation:
+     mbedtls_ecdh_gen_public() and mbedtls_ecdh_compute_shared().
+   * Add support for alternative implementation of ECJPAKE, controlled by
+     the new configuration flag MBEDTLS_ECJPAKE_ALT.
+
+API Changes
+   * Extend RSA interface by multiple functions allowing structure-
+     independent setup and export of RSA contexts. Most notably,
+     mbedtls_rsa_import and mbedtls_rsa_complete are introduced for setting
+     up RSA contexts from partial key material and having them completed to the
+     needs of the implementation automatically. This allows to setup private RSA
+     contexts from keys consisting of N,D,E only, even if P,Q are needed for the
+     purpose or CRT and/or blinding.
+   * The configuration option MBEDTLS_RSA_ALT can be used to define alternative
+     implementations of the RSA interface declared in rsa.h.
+   * The following functions in the message digest modules (MD2, MD4, MD5,
+     SHA1, SHA256, SHA512) have been deprecated and replaced as shown below.
+     The new functions change the return type from void to int to allow
+     returning error codes when using MBEDTLS_<MODULE>_ALT.
+     mbedtls_<MODULE>_starts() -> mbedtls_<MODULE>_starts_ret()
+     mbedtls_<MODULE>_update() -> mbedtls_<MODULE>_update_ret()
+     mbedtls_<MODULE>_finish() -> mbedtls_<MODULE>_finish_ret()
+     mbedtls_<MODULE>_process() -> mbedtls_internal_<MODULE>_process()
+
+New deprecations
+   * Deprecate usage of RSA primitives with non-matching key-type
+     (e.g., signing with a public key).
+   * Direct manipulation of structure fields of RSA contexts is deprecated.
+     Users are advised to use the extended RSA API instead.
+   * Deprecate usage of message digest functions that return void
+     (mbedtls_<MODULE>_starts, mbedtls_<MODULE>_update,
+     mbedtls_<MODULE>_finish and mbedtls_<MODULE>_process where <MODULE> is
+     any of MD2, MD4, MD5, SHA1, SHA256, SHA512) in favor of functions
+     that can return an error code.
 
 Bugfix
    * Fix ssl_parse_record_header() to silently discard invalid DTLS records
@@ -54,11 +106,52 @@ Bugfix
      Reported by Yolan Romailler.
    * Fix word size check in in pk.c to not depend on MBEDTLS_HAVE_INT64.
    * Fix incorrect unit in benchmark output. #850
+   * Fix crash when calling mbedtls_ssl_cache_free() twice. Found by
+     MilenkoMitrovic, #1104
+   * Fix mbedtls_timing_alarm(0) on Unix and MinGW.
+   * Fix use of uninitialized memory in mbedtls_timing_get_timer when reset=1.
+   * Fix possible memory leaks in mbedtls_gcm_self_test().
+   * Added missing return code checks in mbedtls_aes_self_test().
+   * Fix issues in RSA key generation program programs/x509/rsa_genkey and the
+     RSA test suite where the failure of CTR DRBG initialization lead to
+     freeing an RSA context and several MPI's without proper initialization
+     beforehand.
+   * Fix error message in programs/pkey/gen_key.c. Found and fixed by Chris Xue.
+   * Fix programs/pkey/dh_server.c so that it actually works with dh_client.c.
+     Found and fixed by Martijn de Milliano.
+   * Fix bug in cipher decryption with MBEDTLS_PADDING_ONE_AND_ZEROS that
+     sometimes accepted invalid padding. (Not used in TLS.) Found and fixed
+     by Micha Kraus.
+   * Fix the entropy.c module to not call mbedtls_sha256_starts() or
+     mbedtls_sha512_starts() in the mbedtls_entropy_init() function.
+   * Fix the entropy.c module to ensure that mbedtls_sha256_init() or
+     mbedtls_sha512_init() is called before operating on the relevant context
+     structure. Do not assume that zeroizing a context is a correct way to
+     reset it. Found independently by ccli8 on Github.
+   * In mbedtls_entropy_free(), properly free the message digest context.
 
 Changes
    * Extend cert_write example program by options to set the CRT version
      and the message digest. Further, allow enabling/disabling of authority
      identifier, subject identifier and basic constraints extensions.
+   * Only check for necessary RSA structure fields in `mbedtls_rsa_private`. In
+     particular, don't require P,Q if neither CRT nor blinding are
+     used. Reported and fix proposed independently by satur9nine and sliai
+     on GitHub.
+   * Only run AES-192 self-test if AES-192 is available. Fixes #963.
+   * Tighten the RSA PKCS#1 v1.5 signature verification code and remove the
+     undeclared dependency of the RSA module on the ASN.1 module.
+   * Add mechanism to provide alternative implementation of the DHM module.
+   * Update all internal usage of deprecated message digest functions to the
+     new ones with return codes. In particular, this modifies the
+     mbedtls_md_info_t structure. Propagate errors from these functions
+     everywhere except some locations in the ssl_tls.c module.
+   * Improve CTR_DRBG error handling by propagating underlying AES errors.
+   * Add MBEDTLS_ERR_XXX_HW_ACCEL_FAILED error codes for all cryptography
+     modules where the software implementation can be replaced by a hardware
+     implementation.
+   * Add explicit warnings for the use of MD2, MD4, MD5, SHA-1, DES and ARC4
+     throughout the library.
 
 = mbed TLS 2.6.0 branch released 2017-08-10
 

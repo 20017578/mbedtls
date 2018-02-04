@@ -286,40 +286,33 @@ has_mem_err() {
     fi
 }
 
-# wait for server to start: two versions depending on lsof availability
-wait_server_start() {
-    if which lsof >/dev/null 2>&1; then
-        START_TIME=$( date +%s )
-        DONE=0
-
-        # make a tight loop, server usually takes less than 1 sec to start
+# Wait for process $2 to be listening on port $1
+if type lsof >/dev/null 2>/dev/null; then
+    wait_server_start() {
+        START_TIME=$(date +%s)
         if [ "$DTLS" -eq 1 ]; then
-            while [ $DONE -eq 0 ]; do
-                if lsof -nbi UDP:"$SRV_PORT" 2>/dev/null | grep UDP >/dev/null
-                then
-                    DONE=1
-                elif [ $(( $( date +%s ) - $START_TIME )) -gt $DOG_DELAY ]; then
-                    echo "SERVERSTART TIMEOUT"
-                    echo "SERVERSTART TIMEOUT" >> $SRV_OUT
-                    DONE=1
-                fi
-            done
+            proto=UDP
         else
-            while [ $DONE -eq 0 ]; do
-                if lsof -nbi TCP:"$SRV_PORT" 2>/dev/null | grep LISTEN >/dev/null
-                then
-                    DONE=1
-                elif [ $(( $( date +%s ) - $START_TIME )) -gt $DOG_DELAY ]; then
-                    echo "SERVERSTART TIMEOUT"
-                    echo "SERVERSTART TIMEOUT" >> $SRV_OUT
-                    DONE=1
-                fi
-            done
+            proto=TCP
         fi
-    else
+        # Make a tight loop, server normally takes less than 1s to start.
+        while ! lsof -a -n -b -i "$proto:$1" -p "$2" >/dev/null 2>/dev/null; do
+              if [ $(( $(date +%s) - $START_TIME )) -gt $DOG_DELAY ]; then
+                  echo "SERVERSTART TIMEOUT"
+                  echo "SERVERSTART TIMEOUT" >> $SRV_OUT
+                  break
+              fi
+              # Linux and *BSD support decimal arguments to sleep. On other
+              # OSes this may be a tight loop.
+              sleep 0.1 2>/dev/null || true
+        done
+    }
+else
+    echo "Warning: lsof not available, wait_server_start = sleep $START_DELAY"
+    wait_server_start() {
         sleep "$START_DELAY"
-    fi
-}
+    }
+fi
 
 # Given the client or server debug output, parse the unix timestamp that is
 # included in the first 4 bytes of the random bytes and check that it's within
@@ -466,7 +459,7 @@ run_test() {
         echo "$SRV_CMD" > $SRV_OUT
         provide_input | $SRV_CMD >> $SRV_OUT 2>&1 &
         SRV_PID=$!
-        wait_server_start
+        wait_server_start "$SRV_PORT" "$SRV_PID"
 
         echo "$CLI_CMD" > $CLI_OUT
         eval "$CLI_CMD" >> $CLI_OUT 2>&1 &
@@ -664,14 +657,28 @@ fi
 # used by watchdog
 MAIN_PID="$$"
 
-# be more patient with valgrind
+# We use somewhat arbitrary delays for tests:
+# - how long do we wait for the server to start (when lsof not available)?
+# - how long do we allow for the client to finish?
+#   (not to check performance, just to avoid waiting indefinitely)
+# Things are slower with valgrind, so give extra time here.
+#
+# Note: without lsof, there is a trade-off between the running time of this
+# script and the risk of spurious errors because we didn't wait long enough.
+# The watchdog delay on the other hand doesn't affect normal running time of
+# the script, only the case where a client or server gets stuck.
 if [ "$MEMCHECK" -gt 0 ]; then
-    START_DELAY=3
-    DOG_DELAY=30
+    START_DELAY=6
+    DOG_DELAY=60
 else
-    START_DELAY=1
-    DOG_DELAY=10
+    START_DELAY=2
+    DOG_DELAY=20
 fi
+
+# some particular tests need more time:
+# - for the client, we multiply the usual watchdog limit by a factor
+# - for the server, we sleep for a number of seconds after the client exits
+# see client_need_more_time() and server_needs_more_time()
 CLI_DELAY_FACTOR=1
 SRV_DELAY_SECONDS=0
 

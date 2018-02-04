@@ -131,15 +131,6 @@ do {                                                                    \
                      ( mbedtls_timing_hardclock() - tsc ) / ( jj * BUFSIZE ) );         \
 } while( 0 )
 
-#if defined(MBEDTLS_ERROR_C)
-#define PRINT_ERROR                                                     \
-        mbedtls_strerror( ret, ( char * )tmp, sizeof( tmp ) );          \
-        mbedtls_printf( "FAILED: %s\n", tmp );
-#else
-#define PRINT_ERROR                                                     \
-        mbedtls_printf( "FAILED: -0x%04x\n", -ret );
-#endif
-
 #if defined(MBEDTLS_MEMORY_BUFFER_ALLOC_C) && defined(MBEDTLS_MEMORY_DEBUG)
 
 #define MEMORY_MEASURE_INIT                                             \
@@ -327,32 +318,32 @@ int main( int argc, char *argv[] )
 
 #if defined(MBEDTLS_MD4_C)
     if( todo.md4 )
-        TIME_AND_TSC( "MD4", mbedtls_md4( buf, BUFSIZE, tmp ) );
+        TIME_AND_TSC( "MD4", mbedtls_md4_ret( buf, BUFSIZE, tmp ) );
 #endif
 
 #if defined(MBEDTLS_MD5_C)
     if( todo.md5 )
-        TIME_AND_TSC( "MD5", mbedtls_md5( buf, BUFSIZE, tmp ) );
+        TIME_AND_TSC( "MD5", mbedtls_md5_ret( buf, BUFSIZE, tmp ) );
 #endif
 
 #if defined(MBEDTLS_RIPEMD160_C)
     if( todo.ripemd160 )
-        TIME_AND_TSC( "RIPEMD160", mbedtls_ripemd160( buf, BUFSIZE, tmp ) );
+        TIME_AND_TSC( "RIPEMD160", mbedtls_ripemd160_ret( buf, BUFSIZE, tmp ) );
 #endif
 
 #if defined(MBEDTLS_SHA1_C)
     if( todo.sha1 )
-        TIME_AND_TSC( "SHA-1", mbedtls_sha1( buf, BUFSIZE, tmp ) );
+        TIME_AND_TSC( "SHA-1", mbedtls_sha1_ret( buf, BUFSIZE, tmp ) );
 #endif
 
 #if defined(MBEDTLS_SHA256_C)
     if( todo.sha256 )
-        TIME_AND_TSC( "SHA-256", mbedtls_sha256( buf, BUFSIZE, tmp, 0 ) );
+        TIME_AND_TSC( "SHA-256", mbedtls_sha256_ret( buf, BUFSIZE, tmp, 0 ) );
 #endif
 
 #if defined(MBEDTLS_SHA512_C)
     if( todo.sha512 )
-        TIME_AND_TSC( "SHA-512", mbedtls_sha512( buf, BUFSIZE, tmp, 0 ) );
+        TIME_AND_TSC( "SHA-512", mbedtls_sha512_ret( buf, BUFSIZE, tmp, 0 ) );
 #endif
 
 #if defined(MBEDTLS_ARC4_C)
